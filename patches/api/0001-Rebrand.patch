@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: granny <granny@purpurmc.org>
+Date: Thu, 16 May 2024 20:37:05 -0700
+Subject: [PATCH] Rebrand
+
+
+diff --git a/src/main/java/io/papermc/paper/ServerBuildInfo.java b/src/main/java/io/papermc/paper/ServerBuildInfo.java
+index 7196594e07af19a14c320d77df893978525fe386..feed36d7c122518e837fc9da31fb87fc37b170b7 100644
+--- a/src/main/java/io/papermc/paper/ServerBuildInfo.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfo.java
+@@ -33,6 +33,13 @@ public interface ServerBuildInfo {
+     Key BRAND_PURPUR_ID = Key.key("purpurmc", "purpur");
+     // Purpur end
+ 
++    // Chair start
++    /**
++     * The brand id for Chair.
++     */
++    Key BRAND_CHAIR_ID = Key.key("afternode", "chair");
++    // Chair end
++
+     /**
+      * Gets the {@code ServerBuildInfo}.
+      *

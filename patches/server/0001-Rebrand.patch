@@ -1,0 +1,504 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Initial Source <auto@mated.null>
+Date: Mon, 16 Dec 2024 20:44:48 +0800
+Subject: [PATCH] Rebrand
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 74d7aaae57e0e9ea9e31c4b2189ba50a0ac83bea..ffc4e9851d0e68dbdbca046d8b6a7c8253aa7d67 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -25,7 +25,7 @@ abstract class MockitoAgentProvider : CommandLineArgumentProvider {
+ // Paper end - configure mockito agent that is needed in newer java versions
+ 
+ dependencies {
+-    implementation(project(":purpur-api")) // Pufferfish // Paper // Purpur
++    implementation(project(":Chair-API")) // Pufferfish // Paper // Purpur // Chair
+     implementation("ca.spottedleaf:concurrentutil:0.0.2") // Paper - Add ConcurrentUtil dependency
+     // Paper start
+     implementation("org.jline:jline-terminal-ffm:3.27.1") // use ffm on java 22+
+@@ -119,14 +119,14 @@ tasks.jar {
+         val gitBranch = git("rev-parse", "--abbrev-ref", "HEAD").getText().trim() // Paper
+         attributes(
+             "Main-Class" to "org.bukkit.craftbukkit.Main",
+-            "Implementation-Title" to "Purpur", // Pufferfish // Purpur
++            "Implementation-Title" to "Chair", // Pufferfish // Purpur // Chair
+             "Implementation-Version" to implementationVersion,
+             "Implementation-Vendor" to date, // Paper
+-            "Specification-Title" to "Purpur", // Pufferfish // Purpur
++            "Specification-Title" to "Chair", // Pufferfish // Purpur // Chair
+             "Specification-Version" to project.version,
+-            "Specification-Vendor" to "Purpur Team", // Pufferfish // Purpur
+-            "Brand-Id" to "purpurmc:purpur", // Pufferfish // Purpur
+-            "Brand-Name" to "Purpur", // Pufferfish // Purpur
++            "Specification-Vendor" to "AFterNode", // Pufferfish // Purpur // Chair
++            "Brand-Id" to "afternode:chair", // Pufferfish // Purpur // Chair
++            "Brand-Name" to "Chair", // Pufferfish // Purpur // Chair
+             "Build-Number" to (build ?: ""),
+             "Build-Time" to Instant.now().toString(),
+             "Git-Branch" to gitBranch, // Paper
+diff --git a/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java b/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
+index 6d36fc6d8e22d9b68dea3830f6ecc8763184c343..666f74a163c8ba7450ff54064ab41c95bcbdae25 100644
+--- a/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
++++ b/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
+@@ -36,7 +36,7 @@ public class PaperVersionFetcher implements VersionFetcher {
+     private static final int DISTANCE_ERROR = -1;
+     private static final int DISTANCE_UNKNOWN = -2;
+     // Purpur start
+-    private static final String DOWNLOAD_PAGE = "https://purpurmc.org/downloads";
++    private static final String DOWNLOAD_PAGE = "https://api.example.com/nonexistent/downloads"; // Tentacles
+     private static int distance = DISTANCE_UNKNOWN; public int distance() { return distance; }
+     // Purpur end
+ 
+@@ -52,7 +52,7 @@ public class PaperVersionFetcher implements VersionFetcher {
+         if (build.buildNumber().isEmpty() && build.gitCommit().isEmpty()) {
+             updateMessage = text("You are running a development version without access to version information", color(0xFF5300));
+         } else {
+-            updateMessage = getUpdateStatusMessage("PurpurMC/Purpur", build); // Purpur
++            updateMessage = getUpdateStatusMessage("AFterNode/Chair", build); // Purpur // Chair
+         }
+         final @Nullable Component history = this.getHistory();
+ 
+@@ -62,16 +62,18 @@ public class PaperVersionFetcher implements VersionFetcher {
+     private static Component getUpdateStatusMessage(final String repo, final ServerBuildInfo build) {
+         //int distance = DISTANCE_ERROR; // Purpur - use field
+ 
++        /* // Chair start
+         final OptionalInt buildNumber = build.buildNumber();
+         if (buildNumber.isPresent()) {
+             distance = fetchDistanceFromSiteApi(build, buildNumber.getAsInt());
+         } else {
++        */ // Chair end
+             final Optional<String> gitBranch = build.gitBranch();
+             final Optional<String> gitCommit = build.gitCommit();
+             if (gitBranch.isPresent() && gitCommit.isPresent()) {
+                 distance = fetchDistanceFromGitHub(repo, gitBranch.get(), gitCommit.get());
+             }
+-        }
++        //} // Chair
+ 
+         return switch (distance) {
+             case DISTANCE_ERROR -> text("* Error obtaining version information", NamedTextColor.RED); // Purpur
+@@ -89,7 +91,7 @@ public class PaperVersionFetcher implements VersionFetcher {
+     private static int fetchDistanceFromSiteApi(final ServerBuildInfo build, final int jenkinsBuild) {
+         try {
+             try (final BufferedReader reader = Resources.asCharSource(
+-                URI.create("https://api.purpurmc.org/v2/purpur/" + build.minecraftVersionId()).toURL(), // Purpur
++                URI.create("https://api.example.com/nonexistent/" + build.minecraftVersionId()).toURL(), // Purpur // Chair
+                 Charsets.UTF_8
+             ).openBufferedStream()) {
+                 final JsonObject json = new Gson().fromJson(reader, JsonObject.class);
+@@ -97,7 +99,7 @@ public class PaperVersionFetcher implements VersionFetcher {
+                 final int latest = json.getAsJsonObject("builds").getAsJsonPrimitive("latest").getAsInt(); // Purpur
+                 return latest - jenkinsBuild;
+             } catch (final JsonSyntaxException ex) {
+-                LOGGER.error("Error parsing json from Purpur's downloads API", ex); // Purpur
++                LOGGER.error("Error parsing json from nonexistent downloads API.", ex); // Purpur // Chair
+                 return DISTANCE_ERROR;
+             }
+         } catch (final IOException e) {
+@@ -108,6 +110,7 @@ public class PaperVersionFetcher implements VersionFetcher {
+ 
+     // Contributed by Techcable <Techcable@outlook.com> in GH-65
+     private static int fetchDistanceFromGitHub(final String repo, final String branch, final String hash) {
++        /*
+         try {
+             final HttpURLConnection connection = (HttpURLConnection) URI.create("https://api.github.com/repos/%s/compare/%s...%s".formatted(repo, branch, hash)).toURL().openConnection();
+             connection.connect();
+@@ -128,6 +131,8 @@ public class PaperVersionFetcher implements VersionFetcher {
+             LOGGER.error("Error while parsing version", e);
+             return DISTANCE_ERROR;
+         }
++         */
++        return 0;   // Chair - Temporary disabled
+     }
+ 
+     private @Nullable Component getHistory() {
+diff --git a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
+index 90b3526479320064378f2cde6c2f2b8e48a59ba6..7f059999e0ef384611ebf9745b5c30c9bff3bd6e 100644
+--- a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
++++ b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
+@@ -20,7 +20,7 @@ public final class PaperConsole extends SimpleTerminalConsole {
+     @Override
+     protected LineReader buildReader(LineReaderBuilder builder) {
+         builder
+-                .appName("Purpur") // Purpur
++                .appName("Chair") // Purpur // Chair
+                 .variable(LineReader.HISTORY_FILE, java.nio.file.Paths.get(".console_history"))
+                 .completer(new ConsoleCommandCompleter(this.server))
+                 .option(LineReader.Option.COMPLETE_IN_WORD, true);
+diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+index 3099c21ee589acf6edff5903a23673adf489024f..39e0dd81d66f490527cafae038a8512e1b656b8a 100644
+--- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -33,6 +33,7 @@ public record ServerBuildInfoImpl(
+     private static final String BRAND_PAPER_NAME = "Paper";
+     private static final String BRAND_PUFFERFISH_NAME = "Pufferfish"; // Purpur
+     private static final String BRAND_PURPUR_NAME = "Purpur"; // Purpur
++    private static final String BRAND_CHAIR_NAME = "Chair"; // Chair
+ 
+     private static final String BUILD_DEV = "DEV";
+ 
+@@ -44,9 +45,9 @@ public record ServerBuildInfoImpl(
+         this(
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_ID)
+                 .map(Key::key)
+-                .orElse(BRAND_PURPUR_ID), // Purpur
++                .orElse(BRAND_CHAIR_ID), // Purpur // Chair
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_NAME)
+-                .orElse(BRAND_PURPUR_NAME), // Purpur
++                .orElse(BRAND_CHAIR_NAME), // Purpur // Chair
+             SharedConstants.getCurrentVersion().getId(),
+             SharedConstants.getCurrentVersion().getName(),
+             getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
+@@ -63,7 +64,7 @@ public record ServerBuildInfoImpl(
+ 
+     @Override
+     public boolean isBrandCompatible(final @NotNull Key brandId) {
+-        return brandId.equals(this.brandId) || brandId.equals(BRAND_PAPER_ID) || brandId.equals(BRAND_PUFFERFISH_ID); // Purpur
++        return brandId.equals(this.brandId) || brandId.equals(BRAND_PAPER_ID) || brandId.equals(BRAND_PUFFERFISH_ID) || brandId.equals(BRAND_PURPUR_ID); // Purpur // Chair
+     }
+ 
+     @Override
+diff --git a/src/main/java/net/minecraft/CrashReport.java b/src/main/java/net/minecraft/CrashReport.java
+index 710477ae27ebc5afdf0012ef0867d05efd293c24..cc7d6b102c743898eff8a990c845f38cbe4d991f 100644
+--- a/src/main/java/net/minecraft/CrashReport.java
++++ b/src/main/java/net/minecraft/CrashReport.java
+@@ -32,7 +32,7 @@ public class CrashReport {
+     private boolean trackingStackTrace = true;
+     private StackTraceElement[] uncategorizedStackTrace = new StackTraceElement[0];
+     private final SystemReport systemReport = new SystemReport();
+-    private List<String> extraInfo = List.of("", "DO NOT REPORT THIS TO PAPER! REPORT TO PURPUR INSTEAD!", ""); // Purpur - Rebrand
++    private List<String> extraInfo = List.of("", "DO NOT REPORT THIS TO PURPUR! REPORT TO AFterNode/Chair INSTEAD!", ""); // Purpur - Rebrand // Chair
+ 
+     public CrashReport(String message, Throwable cause) {
+         io.papermc.paper.util.StacktraceDeobfuscator.INSTANCE.deobfuscateThrowable(cause); // Paper
+diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+index 5e7b833fc9f37bc370c76e5c43e6c9919d6d20af..73a2dccef39f410e95b841babf2cdbb1e7e9fa0a 100644
+--- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
++++ b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+@@ -491,7 +491,7 @@ public class CraftScheduler implements BukkitScheduler {
+                 this.parsePending();
+             } else {
+                 // this.debugTail = this.debugTail.setNext(new CraftAsyncDebugger(this.currentTick + CraftScheduler.RECENT_TICKS, task.getOwner(), task.getTaskClass())); // Paper
+-                task.getOwner().getLogger().log(Level.SEVERE, "Unexpected Async Task in the Sync Scheduler. Report this to Purpur"); // Paper // Purpur
++                task.getOwner().getLogger().log(Level.SEVERE, "Unexpected Async Task in the Sync Scheduler. Report this to AFterNode/Chair"); // Paper // Purpur // Chair
+                 // We don't need to parse pending
+                 // (async tasks must live with race-conditions if they attempt to cancel between these few lines of code)
+             }
+diff --git a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
+index 99597258e8e88cd9e2c901c4ac3ff7faeeabee2b..c6a4660da76e4600ce9948865cdf00da02c9a8eb 100644
+--- a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
+@@ -11,7 +11,7 @@ public final class Versioning {
+     public static String getBukkitVersion() {
+         String result = "Unknown-Version";
+ 
+-        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/org.purpurmc.purpur/purpur-api/pom.properties"); // Pufferfish // Purpur
++        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/cn.afternode.chair/Chair-API/pom.properties"); // Pufferfish // Purpur // Chair
+         Properties properties = new Properties();
+ 
+         if (stream != null) {
+diff --git a/src/main/java/org/spigotmc/WatchdogThread.java b/src/main/java/org/spigotmc/WatchdogThread.java
+index f51cc3de3ca935ef90f7f0e9dd0506b856fc55f3..a486d051c5ac9af85999608a4cd0503f62173de0 100644
+--- a/src/main/java/org/spigotmc/WatchdogThread.java
++++ b/src/main/java/org/spigotmc/WatchdogThread.java
+@@ -155,14 +155,14 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                 if (isLongTimeout) {
+                 // Paper end
+                 log.log( Level.SEVERE, "------------------------------" );
+-                log.log( Level.SEVERE, "The server has stopped responding! This is (probably) not a Purpur bug." ); // Paper // Purpur
++                log.log( Level.SEVERE, "The server has stopped responding! This is (probably) not a Chair bug." ); // Paper // Purpur // Chair
+                 log.log( Level.SEVERE, "If you see a plugin in the Server thread dump below, then please report it to that author" );
+                 log.log( Level.SEVERE, "\t *Especially* if it looks like HTTP or MySQL operations are occurring" );
+                 log.log( Level.SEVERE, "If you see a world save or edit, then it means you did far more than your server can handle at once" );
+                 log.log( Level.SEVERE, "\t If this is the case, consider increasing timeout-time in spigot.yml but note that this will replace the crash with LARGE lag spikes" );
+-                log.log( Level.SEVERE, "If you are unsure or still think this is a Purpur bug, please report this to https://github.com/PurpurMC/Purpur/issues" ); // Purpur
++                log.log( Level.SEVERE, "If you are unsure or still think this is a Chair bug, please report this to https://github.com/AFterNode/Chair/issues" ); // Purpur // Chair
+                 log.log( Level.SEVERE, "Be sure to include ALL relevant console errors and Minecraft crash reports" );
+-                log.log( Level.SEVERE, "Purpur version: " + Bukkit.getServer().getVersion() ); // Purpur
++                log.log( Level.SEVERE, "Chair version: " + Bukkit.getServer().getVersion() ); // Purpur // Chair
+                 //
+                 if ( net.minecraft.world.level.Level.lastPhysicsProblem != null )
+                 {
+@@ -184,7 +184,7 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                 // Paper end
+                 } else
+                 {
+-                    log.log(Level.SEVERE, "--- DO NOT REPORT THIS TO PURPUR - THIS IS NOT A BUG OR A CRASH  - " + Bukkit.getServer().getVersion() + " ---"); // Purpur
++                    log.log(Level.SEVERE, "--- DO NOT REPORT THIS TO CHAIR - THIS IS NOT A BUG OR A CRASH  - " + Bukkit.getServer().getVersion() + " ---"); // Purpur // Chair
+                     log.log(Level.SEVERE, "The server has not responded for " + (currentTime - lastTick) / 1000 + " seconds! Creating thread dump");
+                 }
+                 // Paper end - Different message for short timeout
+@@ -205,7 +205,7 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+                     WatchdogThread.dumpThread( thread, log );
+                 }
+                 } else {
+-                    log.log(Level.SEVERE, "--- DO NOT REPORT THIS TO PURPUR - THIS IS NOT A BUG OR A CRASH ---"); // Purpur
++                    log.log(Level.SEVERE, "--- DO NOT REPORT THIS TO CHAIR - THIS IS NOT A BUG OR A CRASH ---"); // Purpur // Chair
+                 }
+ 
+                 log.log( Level.SEVERE, "------------------------------" );
+diff --git a/src/main/resources/logo.png b/src/main/resources/logo.png
+index 518591dd83289e041a16e2c2e7d7e7640d4b2e1b..a776c0ebb42fb9f69cf40748ed069896040f492c 100644
+GIT binary patch
+literal 4824
+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
+bLJxg3&Od=4dP!x-{(G{uwx<;BIDGV<ShL`b
+
+literal 9260
+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
+HqBZh=dic2S
+
