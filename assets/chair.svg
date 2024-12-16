@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 171.18 349.24">
+  <defs>
+    <style>
+      .d {
+        stroke: #7c7c7c;
+      }
+
+      .d, .e {
+        fill: none;
+        stroke-width: 5px;
+      }
+
+      .d, .e, .f {
+        stroke-miterlimit: 10;
+      }
+
+      .e {
+        stroke: #3a3a3a;
+      }
+
+      .f {
+        fill: #d3d1d0;
+        stroke: #d3d1d0;
+      }
+    </style>
+  </defs>
+  <g id="b" data-name="plastic_x5F_chair">
+    <polygon class="f" points="14.14 324.23 .56 324.23 13.72 199.54 27.3 199.54 14.14 324.23"/>
+    <polygon class="f" points="168.25 324.23 154.67 324.23 140.68 199.54 154.26 199.54 168.25 324.23"/>
+    <rect class="f" x="13.72" y="191.72" width="140.74" height="7.82"/>
+    <polygon class="f" points="144.17 197.48 153.63 197.48 170.63 .5 161.17 .5 144.17 197.48"/>
+    <polygon class="f" points="52.7 106.17 45.6 106.17 13.93 190.89 21.03 190.89 52.7 106.17"/>
+    <rect class="f" x="50.2" y="106.17" width="101.77" height="5.5"/>
+  </g>
+  <g id="c" data-name="wheel">
+    <line class="d" x1="84.23" y1="192.7" x2="83.99" y2="344.83"/>
+    <line class="d" x1="30.68" y1="214.79" x2="138.08" y2="322.53"/>
+    <line class="d" x1="8.09" y1="268.51" x2="160.22" y2="268.74"/>
+    <line class="d" x1="30.68" y1="323.28" x2="138.41" y2="215.87"/>
+    <circle class="e" cx="84.22" cy="268.92" r="77.82"/>
+    <circle class="d" cx="84.22" cy="268.92" r="73.18"/>
+  </g>
+</svg>
