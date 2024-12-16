@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zyklone <h3xadecimal@afternode.cn>
+Date: Mon, 16 Dec 2024 22:10:48 +0800
+Subject: [PATCH] player specified dump in watchdog
+
+
+diff --git a/src/main/java/org/spigotmc/WatchdogThread.java b/src/main/java/org/spigotmc/WatchdogThread.java
+index a486d051c5ac9af85999608a4cd0503f62173de0..d838e247f8b7f3b1494a3e9bedc47c1bc40b4b54 100644
+--- a/src/main/java/org/spigotmc/WatchdogThread.java
++++ b/src/main/java/org/spigotmc/WatchdogThread.java
+@@ -6,6 +6,7 @@ import java.lang.management.ThreadInfo;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
+ import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerPlayer;
+ import org.bukkit.Bukkit;
+ 
+ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThread // Paper - rewrite chunk system
+@@ -47,6 +48,11 @@ public class WatchdogThread extends ca.spottedleaf.moonrise.common.util.TickThre
+         log.log(Level.SEVERE, "Ticking entity: " + entityType + ", entity class: " + entity.getClass().getName());
+         log.log(Level.SEVERE, "Entity status: removed: " + entity.isRemoved() + ", valid: " + entity.valid + ", alive: " + entity.isAlive() + ", is passenger: " + entity.isPassenger());
+         log.log(Level.SEVERE, "Entity UUID: " + entityUUID);
++        // Chair start - Player specified dump
++        if (entity instanceof ServerPlayer player) {
++            log.log(Level.SEVERE, "Player: \"" + player.getName() + "\", mainhand: " + player.getMainHandItem().getItem().getDescriptionId() +", offhand: " + player.getOffhandItem().getItem().getDescriptionId() + ", brand: \"" + player.getBukkitEntity().getClientBrandName() + "\"");
++        }
++        // Chair end
+         log.log(Level.SEVERE, "Position: world: '" + (world == null ? "unknown world?" : world.getWorld().getName()) + "' at location (" + posX + ", " + posY + ", " + posZ + ")");
+         log.log(Level.SEVERE, "Velocity: " + (mot == null ? "unknown velocity" : mot.toString()) + " (in blocks per tick)");
+         log.log(Level.SEVERE, "Entity AABB: " + entity.getBoundingBox());
