@@ -1,0 +1,131 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zyklone <h3xadecimal@afternode.cn>
+Date: Mon, 16 Dec 2024 23:01:41 +0800
+Subject: [PATCH] maven library loader configuration
+
+
+diff --git a/src/main/java/cn/afternode/chair/Chair.java b/src/main/java/cn/afternode/chair/Chair.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae9767256d723dacef94ac1aecfe0718462145e7
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/Chair.java
+@@ -0,0 +1,8 @@
++package cn.afternode.chair;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++public class Chair {
++    public static final Logger LOG = LoggerFactory.getLogger("Chair");
++}
+diff --git a/src/main/java/cn/afternode/chair/ChairConfig.java b/src/main/java/cn/afternode/chair/ChairConfig.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..4357af1555b158597de77441681e77d733fb0d56
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/ChairConfig.java
+@@ -0,0 +1,66 @@
++package cn.afternode.chair;
++
++import cn.afternode.chair.api.ChairAPI;
++import org.apache.commons.io.IOUtils;
++import org.eclipse.aether.repository.RemoteRepository;
++import org.simpleyaml.configuration.ConfigurationSection;
++import org.simpleyaml.configuration.file.YamlConfiguration;
++
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.Objects;
++
++public class ChairConfig {
++    private static final String configResource = "configurations/chair.yml";
++
++    private static ChairConfig instance;
++
++    public static ChairConfig getInstance() {
++        return instance;
++    }
++
++    private final YamlConfiguration yaml;
++
++    private ChairConfig(YamlConfiguration yaml) {
++        this.yaml = yaml;
++
++        // Put repositories to API
++        Chair.LOG.info("Adding repositories");
++        ConfigurationSection repoSec = yaml.getConfigurationSection("repositories");
++        for (String key : repoSec.getKeys(false)) {
++            String url = repoSec.getString(key);
++            ChairAPI.addRepository(new RemoteRepository.Builder(key, "default", url)
++                    .build());
++        }
++        ChairAPI.freezeRepositories();
++        Chair.LOG.info("{} repositories added", ChairAPI.getRepositories().size());
++        if (ChairAPI.isAddReposToPaperPluginClasspath())
++            Chair.LOG.warn("{} set to true, repositories will be added to paper MavenLibraryResolver", ChairAPI.PROP_ADD_REPO_TO_PAPER_PLUGIN_CLASSPATH);
++    }
++
++    private ChairConfig(Path path) throws IOException {
++        this(YamlConfiguration.loadConfiguration(() -> Files.newBufferedReader(path, StandardCharsets.UTF_8)));
++    }
++
++    public static void load() throws IOException {
++        Chair.LOG.info("Loading configurations");
++        Path path = Path.of("chair.yml");
++        if (Files.notExists(path)) {
++            Files.createFile(path);
++            InputStream is = Objects.requireNonNull(ChairConfig.class.getClassLoader().getResourceAsStream(configResource), "Default configurations not found");
++            OutputStream os = Files.newOutputStream(path);
++            IOUtils.copy(is, os);
++            is.close();
++            os.close();
++            ChairConfig.useDefault();
++        } else ChairConfig.instance = new ChairConfig(path);
++    }
++
++    public static void useDefault() throws IOException {
++        ChairConfig.instance = new ChairConfig(YamlConfiguration.loadConfiguration(() -> ChairConfig.class.getClassLoader().getResourceAsStream(configResource)));
++    }
++}
+diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
+index a880f4e5cf712654649ad043e58e073e9a87c0fe..d758153bcbf4a8bc88259141ac7342691fd4f950 100644
+--- a/src/main/java/net/minecraft/server/Main.java
++++ b/src/main/java/net/minecraft/server/Main.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.server;
+ 
++import cn.afternode.chair.ChairConfig;
+ import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+ import com.mojang.datafixers.DataFixer;
+ import com.mojang.logging.LogUtils;
+@@ -127,6 +128,7 @@ public class Main {
+             org.purpurmc.purpur.PurpurConfig.clampEnchantLevels = purpurConfiguration.getBoolean("settings.enchantment.clamp-levels", true);
+             org.purpurmc.purpur.PurpurConfig.registerMinecraftDebugCommands = purpurConfiguration.getBoolean("settings.register-minecraft-debug-commands");
+             // Purpur end - load config files early
++            ChairConfig.load(); // Chair - load configurations
+ 
+             io.papermc.paper.plugin.PluginInitializerManager.load(optionset); // Paper
+             Bootstrap.bootStrap();
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index 7a442fb4cf78bcb1268359ee41a6de138edb76b6..e3b7e7a796fc77fa651d26182480d7cb1df111d2 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -1,5 +1,7 @@
+ package net.minecraft.server.dedicated;
+ 
++import cn.afternode.chair.Chair;
++import cn.afternode.chair.ChairConfig;
+ import com.google.common.collect.Lists;
+ import com.mojang.authlib.GameProfile;
+ import com.mojang.datafixers.DataFixer;
+diff --git a/src/main/resources/configurations/chair.yml b/src/main/resources/configurations/chair.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f176e5045ab9e59780a548e18b1127c3eec21f1
+--- /dev/null
++++ b/src/main/resources/configurations/chair.yml
+@@ -0,0 +1,2 @@
++repositories:
++  central: "https://repo.maven.apache.org/maven2/"

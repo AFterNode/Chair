@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zyklone <h3xadecimal@afternode.cn>
+Date: Mon, 16 Dec 2024 23:01:43 +0800
+Subject: [PATCH] maven library loader configuration
+
+
+diff --git a/src/main/java/cn/afternode/chair/api/ChairAPI.java b/src/main/java/cn/afternode/chair/api/ChairAPI.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e73f0ac588656af29bae178ebf6e2f4d74eb436a
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/api/ChairAPI.java
+@@ -0,0 +1,34 @@
++package cn.afternode.chair.api;
++
++import org.eclipse.aether.repository.RemoteRepository;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++
++public class ChairAPI {
++    public static final String PROP_ADD_REPO_TO_PAPER_PLUGIN_CLASSPATH = "chair.addReposToPaperPluginClasspath";
++
++    private static final boolean addReposToPaperPluginClasspath = Boolean.getBoolean(PROP_ADD_REPO_TO_PAPER_PLUGIN_CLASSPATH);
++    private static List<RemoteRepository> repositories = new ArrayList<>();
++
++    public static List<RemoteRepository> getRepositories() {
++        return repositories;
++    }
++
++    public static void addRepository(RemoteRepository... repositories) {
++        Collections.addAll(ChairAPI.repositories, repositories);
++    }
++
++    public static void addRepository(RemoteRepository repository) {
++        ChairAPI.repositories.add(repository);
++    }
++
++    public static void freezeRepositories() {
++        ChairAPI.repositories = Collections.unmodifiableList(ChairAPI.repositories);
++    }
++
++    public static boolean isAddReposToPaperPluginClasspath() {
++        return addReposToPaperPluginClasspath;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/loader/library/impl/MavenLibraryResolver.java b/src/main/java/io/papermc/paper/plugin/loader/library/impl/MavenLibraryResolver.java
+index 107705db2d82b7c191e5e625ec888e0bc3b03831..95a61835d25519af031fb2814975a1e7ffcda8f7 100644
+--- a/src/main/java/io/papermc/paper/plugin/loader/library/impl/MavenLibraryResolver.java
++++ b/src/main/java/io/papermc/paper/plugin/loader/library/impl/MavenLibraryResolver.java
+@@ -1,5 +1,6 @@
+ package io.papermc.paper.plugin.loader.library.impl;
+ 
++import cn.afternode.chair.api.ChairAPI;
+ import io.papermc.paper.plugin.loader.library.ClassPathLibrary;
+ import io.papermc.paper.plugin.loader.library.LibraryLoadingException;
+ import io.papermc.paper.plugin.loader.library.LibraryStore;
+@@ -83,6 +84,11 @@ public class MavenLibraryResolver implements ClassPathLibrary {
+             }
+         });
+         this.session.setReadOnly();
++
++        // Chair start - Paper plugin maven repository
++        if (ChairAPI.isAddReposToPaperPluginClasspath())
++            this.repositories.addAll(ChairAPI.getRepositories());
++        // Chair end
+     }
+ 
+     /**
+diff --git a/src/main/java/org/bukkit/plugin/java/LibraryLoader.java b/src/main/java/org/bukkit/plugin/java/LibraryLoader.java
+index 97f580fccd06a8db5f592a53c8b95a7a6159adac..9a1c0b20d3d8dce4acc4c000714b91ad5d900532 100644
+--- a/src/main/java/org/bukkit/plugin/java/LibraryLoader.java
++++ b/src/main/java/org/bukkit/plugin/java/LibraryLoader.java
+@@ -10,6 +10,8 @@ import java.util.Arrays;
+ import java.util.List;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
++
++import cn.afternode.chair.api.ChairAPI;
+ import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
+ import org.bukkit.plugin.PluginDescriptionFile;
+ import org.eclipse.aether.DefaultRepositorySystemSession;
+@@ -79,7 +81,10 @@ public class LibraryLoader
+         session.setSystemProperties( System.getProperties() );
+         session.setReadOnly();
+ 
+-        this.repositories = repository.newResolutionRepositories( session, Arrays.asList( new RemoteRepository.Builder( "central", "default", "https://repo.maven.apache.org/maven2" ).build() ) );
++        // Chair start - Custom repository
++//        this.repositories = repository.newResolutionRepositories( session, Arrays.asList( new RemoteRepository.Builder( "central", "default", "https://repo.maven.apache.org/maven2" ).build() ) );
++        this.repositories = repository.newResolutionRepositories(session, ChairAPI.getRepositories());
++        // Chair end
+     }
+ 
+     @Nullable
