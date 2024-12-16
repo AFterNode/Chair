@@ -173,6 +173,28 @@ index 710477ae27ebc5afdf0012ef0867d05efd293c24..cc7d6b102c743898eff8a990c845f38c
  
      public CrashReport(String message, Throwable cause) {
          io.papermc.paper.util.StacktraceDeobfuscator.INSTANCE.deobfuscateThrowable(cause); // Paper
+diff --git a/src/main/java/net/minecraft/server/gui/MinecraftServerGui.java b/src/main/java/net/minecraft/server/gui/MinecraftServerGui.java
+index 8f74c2ec5252b6265549589310d742337c91cb2c..eba7a18cd1b1a3ca26acfbd062218d0336774415 100644
+--- a/src/main/java/net/minecraft/server/gui/MinecraftServerGui.java
++++ b/src/main/java/net/minecraft/server/gui/MinecraftServerGui.java
+@@ -56,7 +56,7 @@ public class MinecraftServerGui extends JComponent {
+             ;
+         }
+ 
+-        final JFrame jframe = new JFrame("Purpur Minecraft server"); // Purpur
++        final JFrame jframe = new JFrame("Chair"); // Purpur    // Chair
+         final MinecraftServerGui servergui = new MinecraftServerGui(server);
+ 
+         jframe.setDefaultCloseOperation(2);
+@@ -64,7 +64,7 @@ public class MinecraftServerGui extends JComponent {
+         jframe.pack();
+         jframe.setLocationRelativeTo((Component) null);
+         jframe.setVisible(true);
+-        jframe.setName("Purpur Minecraft server"); // Paper - Improve ServerGUI // Purpur
++        jframe.setName("Chair"); // Paper - Improve ServerGUI // Purpur // Chair
+ 
+         // Paper start - Improve ServerGUI
+         try {
 diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
 index 5e7b833fc9f37bc370c76e5c43e6c9919d6d20af..73a2dccef39f410e95b841babf2cdbb1e7e9fa0a 100644
 --- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
