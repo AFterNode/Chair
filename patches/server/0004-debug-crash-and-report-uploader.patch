@@ -1,0 +1,202 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zyklone <h3xadecimal@afternode.cn>
+Date: Tue, 17 Dec 2024 20:52:14 +0800
+Subject: [PATCH] debug crash and report uploader
+
+
+diff --git a/src/main/java/cn/afternode/chair/ChairConfig.java b/src/main/java/cn/afternode/chair/ChairConfig.java
+index 094f8306555fb523d13fc028a9becbec3aef623b..c2b77fc8ac9971a4804a434967967f978ebb4ff3 100644
+--- a/src/main/java/cn/afternode/chair/ChairConfig.java
++++ b/src/main/java/cn/afternode/chair/ChairConfig.java
+@@ -20,6 +20,8 @@ public class ChairConfig {
+ 
+     private final YamlConfiguration yaml;
+ 
++    public final boolean crashUpload;
++
+     private ChairConfig(YamlConfiguration yaml) {
+         ChairConfig.putDefaults(yaml);
+         this.yaml = yaml;
+@@ -36,6 +38,9 @@ public class ChairConfig {
+         Chair.LOG.info("{} repositories added", ChairAPI.getRepositories().size());
+         if (ChairAPI.isAddReposToPaperPluginClasspath())
+             Chair.LOG.warn("{} set to true, repositories will be added to paper MavenLibraryResolver", ChairAPI.PROP_ADD_REPO_TO_PAPER_PLUGIN_CLASSPATH);
++
++        // Read remaining
++        this.crashUpload = this.yaml.getBoolean("crash.upload", false);
+     }
+ 
+     private ChairConfig(Path path) throws IOException {
+@@ -47,8 +52,10 @@ public class ChairConfig {
+         Path path = Path.of("chair.yml");
+         if (Files.notExists(path)) {
+             ChairConfig.useDefault();
+-            ChairConfig.instance.yaml.save(Files.newBufferedWriter(path, StandardCharsets.UTF_8));
+         } else ChairConfig.instance = new ChairConfig(path);
++
++        // Autosave (update)
++        ChairConfig.instance.yaml.save(Files.newBufferedWriter(path, StandardCharsets.UTF_8));
+     }
+ 
+     public static void useDefault() throws IOException {
+@@ -60,5 +67,7 @@ public class ChairConfig {
+     private static void putDefaults(YamlConfiguration config) {
+         if (!config.contains("repositories"))
+             config.set("repositories.central", "https://repo.maven.apache.org/maven2/");
++
++        config.addDefault("crash.upload", false);
+     }
+ }
+diff --git a/src/main/java/cn/afternode/chair/command/ChairUnsafeCommand.java b/src/main/java/cn/afternode/chair/command/ChairUnsafeCommand.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc452037daf59897546904252816a60010b8c287
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/command/ChairUnsafeCommand.java
+@@ -0,0 +1,24 @@
++package cn.afternode.chair.command;
++
++import com.mojang.brigadier.CommandDispatcher;
++import net.minecraft.CrashReport;
++import net.minecraft.ReportedException;
++import net.minecraft.commands.CommandSourceStack;
++import net.minecraft.commands.Commands;
++import net.minecraft.server.MinecraftServer;
++
++public class ChairUnsafeCommand {
++    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
++        dispatcher.register(Commands.literal("chair-unsafe")
++                .requires(s -> s.hasPermission(4, "chair.unsafe"))
++                .then(Commands.literal("crash").executes(s -> { // Debug crash command
++                    MinecraftServer ms = MinecraftServer.getServer();
++                    ms.scheduleOnMain(() -> {
++                        throw new ReportedException(new CrashReport("Manually triggered debug crash", new OutOfMemoryError("Manually triggered debug crash")));
++                    });
++                    return 1;
++                }
++                ))
++        );
++    }
++}
+diff --git a/src/main/java/net/minecraft/CrashReport.java b/src/main/java/net/minecraft/CrashReport.java
+index cc7d6b102c743898eff8a990c845f38cbe4d991f..595ec1179883314062c2afc1c6bd8708a36cb294 100644
+--- a/src/main/java/net/minecraft/CrashReport.java
++++ b/src/main/java/net/minecraft/CrashReport.java
+@@ -1,10 +1,18 @@
+ package net.minecraft;
+ 
++import cn.afternode.chair.Chair;
+ import com.google.common.collect.Lists;
++import com.google.gson.Gson;
++import com.google.gson.JsonObject;
+ import com.mojang.logging.LogUtils;
+ import java.io.BufferedWriter;
+ import java.io.PrintWriter;
+ import java.io.StringWriter;
++import java.net.URI;
++import java.net.URLEncoder;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
+ import java.nio.charset.StandardCharsets;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+@@ -15,7 +23,8 @@ import java.util.List;
+ import java.util.Locale;
+ import java.util.concurrent.CompletionException;
+ import javax.annotation.Nullable;
+-import net.minecraft.util.MemoryReserve;
++
++import io.papermc.paper.ServerBuildInfo;
+ import org.apache.commons.io.IOUtils;
+ import org.apache.commons.lang3.ArrayUtils;
+ import org.slf4j.Logger;
+@@ -166,6 +175,7 @@ public class CrashReport {
+ 
+                 try {
+                     bufferedwriter.write(this.getFriendlyReport(type, extraInfo));
++                    if (this.upload != null) bufferedwriter.write("\nCrash report uploaded to: " + this.upload);    // Chair - crash report uploader
+                 } catch (Throwable throwable) {
+                     if (bufferedwriter != null) {
+                         try {
+@@ -195,6 +205,31 @@ public class CrashReport {
+         return this.saveToFile(path, type, extraInfo); // Purpur - Rebrand
+     }
+ 
++    // Chair start - crash report uploader
++    @Nullable private String upload = null;
++
++    public void autoUpload(ReportType type) {
++        try (HttpClient client = HttpClient
++                .newHttpClient()) {
++            HttpResponse<String> resp = client.send(HttpRequest.newBuilder()
++                    .uri(new URI("https://api.mclo.gs/1/log"))
++                    .header("Content-Type", "application/x-www-form-urlencoded")
++                    .header("User-Agent", "Chair/" + ServerBuildInfo.buildInfo().minecraftVersionName() + " CrashUpload")
++                    .POST(HttpRequest.BodyPublishers.ofString("content=" + URLEncoder.encode(this.getFriendlyReport(type), StandardCharsets.UTF_8), StandardCharsets.UTF_8))
++                    .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
++            JsonObject json = new Gson().fromJson(resp.body(), JsonObject.class);
++            if (json.get("success").getAsBoolean()) {
++                upload = json.get("url").getAsString();
++                Chair.LOG.info("Successfully uploaded crash report to {}", upload);
++            } else {
++                Chair.LOG.error("Failed to upload crash report: {}", json.get("error").getAsString());
++            }
++        } catch (Throwable t) {
++            Chair.LOG.error("Unable to upload crash report", t);
++        }
++    }
++    // Chair end
++
+     public SystemReport getSystemReport() {
+         return this.systemReport;
+     }
+diff --git a/src/main/java/net/minecraft/commands/Commands.java b/src/main/java/net/minecraft/commands/Commands.java
+index a5e8f2d8e5963c730a9509eddfadb9ca322c7183..e5c3b5cf3cc3a1de00772f30a3ebc0a378905add 100644
+--- a/src/main/java/net/minecraft/commands/Commands.java
++++ b/src/main/java/net/minecraft/commands/Commands.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.commands;
+ 
++import cn.afternode.chair.command.ChairUnsafeCommand;
+ import com.google.common.collect.Maps;
+ import com.mojang.brigadier.ParseResults;
+ import com.mojang.brigadier.StringReader;
+@@ -38,7 +39,6 @@ import net.minecraft.gametest.framework.TestCommand;
+ import net.minecraft.network.chat.ClickEvent;
+ import net.minecraft.network.chat.CommonComponents;
+ import net.minecraft.network.chat.Component;
+-import net.minecraft.network.chat.ComponentUtils;
+ import net.minecraft.network.chat.HoverEvent;
+ import net.minecraft.network.chat.MutableComponent;
+ import net.minecraft.network.protocol.game.ClientboundCommandsPacket;
+@@ -263,6 +263,8 @@ public class Commands {
+             org.purpurmc.purpur.command.CompassCommand.register(this.dispatcher); // Purpur
+             org.purpurmc.purpur.command.RamBarCommand.register(this.dispatcher); // Purpur
+             org.purpurmc.purpur.command.RamCommand.register(this.dispatcher); // Purpur
++
++            ChairUnsafeCommand.register(this.dispatcher); // Chair - register command
+         }
+ 
+         if (environment.includeIntegrated) {
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+index 95f1e0ae174400f2cf7bfed2897259d5aa2cfcb5..8b6d50def7f7660c1ef8cb06c93a9023669a6565 100644
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.server;
+ 
++import cn.afternode.chair.ChairConfig;
+ import com.google.common.base.Preconditions;
+ import com.google.common.base.Splitter;
+ import com.google.common.collect.ImmutableList;
+@@ -1432,6 +1433,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             this.fillSystemReport(crashreport.getSystemReport());
+             Path path = this.getServerDirectory().resolve("crash-reports").resolve("crash-" + Util.getFilenameFormattedDateTime() + "-server.txt");
+ 
++            // Chair start - crash report uploader
++            if (ChairConfig.getInstance().crashUpload)
++                crashreport.autoUpload(ReportType.CRASH);
++            // Chair end
+             if (crashreport.saveToFile(path, ReportType.CRASH)) {
+                 MinecraftServer.LOGGER.error("This crash report has been saved to: {}", path.toAbsolutePath());
+             } else {
