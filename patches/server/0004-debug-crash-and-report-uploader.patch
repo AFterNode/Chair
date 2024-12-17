@@ -77,8 +77,48 @@ index 0000000000000000000000000000000000000000..bc452037daf59897546904252816a600
 +        );
 +    }
 +}
+diff --git a/src/main/java/cn/afternode/chair/utils/LogUtils.java b/src/main/java/cn/afternode/chair/utils/LogUtils.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..73b08f7fbb7b5e4d12948835b7a52b174f1ce99e
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/utils/LogUtils.java
+@@ -0,0 +1,34 @@
++package cn.afternode.chair.utils;
++
++import com.google.gson.Gson;
++import com.google.gson.JsonObject;
++import io.papermc.paper.ServerBuildInfo;
++
++import java.io.IOException;
++import java.net.URI;
++import java.net.URISyntaxException;
++import java.net.URLEncoder;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.nio.charset.StandardCharsets;
++
++public class LogUtils {
++    public static String uploadLogs(String logs) throws URISyntaxException, IOException, InterruptedException {
++        try (HttpClient client = HttpClient
++                .newHttpClient()) {
++            HttpResponse<String> resp = client.send(HttpRequest.newBuilder()
++                    .uri(new URI("https://api.mclo.gs/1/log"))
++                    .header("Content-Type", "application/x-www-form-urlencoded")
++                    .header("User-Agent", "Chair/" + ServerBuildInfo.buildInfo().minecraftVersionName() + " CrashUpload")
++                    .POST(HttpRequest.BodyPublishers.ofString("content=" + URLEncoder.encode(logs, StandardCharsets.UTF_8), StandardCharsets.UTF_8))
++                    .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
++            JsonObject json = new Gson().fromJson(resp.body(), JsonObject.class);
++            if (json.get("success").getAsBoolean()) {
++                return json.get("url").getAsString();
++            } else {
++                throw new IOException("Logs uploading failed: " +json.get("error").getAsString());
++            }
++        }
++    }
++}
 diff --git a/src/main/java/net/minecraft/CrashReport.java b/src/main/java/net/minecraft/CrashReport.java
-index cc7d6b102c743898eff8a990c845f38cbe4d991f..595ec1179883314062c2afc1c6bd8708a36cb294 100644
+index cc7d6b102c743898eff8a990c845f38cbe4d991f..249b543fc85382010252c35313fbe39d56ae9d0a 100644
 --- a/src/main/java/net/minecraft/CrashReport.java
 +++ b/src/main/java/net/minecraft/CrashReport.java
 @@ -1,10 +1,18 @@
@@ -118,7 +158,7 @@ index cc7d6b102c743898eff8a990c845f38cbe4d991f..595ec1179883314062c2afc1c6bd8708
                  } catch (Throwable throwable) {
                      if (bufferedwriter != null) {
                          try {
-@@ -195,6 +205,31 @@ public class CrashReport {
+@@ -195,6 +205,19 @@ public class CrashReport {
          return this.saveToFile(path, type, extraInfo); // Purpur - Rebrand
      }
  
@@ -126,21 +166,9 @@ index cc7d6b102c743898eff8a990c845f38cbe4d991f..595ec1179883314062c2afc1c6bd8708
 +    @Nullable private String upload = null;
 +
 +    public void autoUpload(ReportType type) {
-+        try (HttpClient client = HttpClient
-+                .newHttpClient()) {
-+            HttpResponse<String> resp = client.send(HttpRequest.newBuilder()
-+                    .uri(new URI("https://api.mclo.gs/1/log"))
-+                    .header("Content-Type", "application/x-www-form-urlencoded")
-+                    .header("User-Agent", "Chair/" + ServerBuildInfo.buildInfo().minecraftVersionName() + " CrashUpload")
-+                    .POST(HttpRequest.BodyPublishers.ofString("content=" + URLEncoder.encode(this.getFriendlyReport(type), StandardCharsets.UTF_8), StandardCharsets.UTF_8))
-+                    .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-+            JsonObject json = new Gson().fromJson(resp.body(), JsonObject.class);
-+            if (json.get("success").getAsBoolean()) {
-+                upload = json.get("url").getAsString();
-+                Chair.LOG.info("Successfully uploaded crash report to {}", upload);
-+            } else {
-+                Chair.LOG.error("Failed to upload crash report: {}", json.get("error").getAsString());
-+            }
++        try  {
++            this.upload = cn.afternode.chair.utils.LogUtils.uploadLogs(this.getFriendlyReport(type));
++            Chair.LOG.info("Report uploaded to {}", this.upload);
 +        } catch (Throwable t) {
 +            Chair.LOG.error("Unable to upload crash report", t);
 +        }
