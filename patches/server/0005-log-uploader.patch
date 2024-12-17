@@ -1,0 +1,195 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zyklone <h3xadecimal@afternode.cn>
+Date: Wed, 18 Dec 2024 00:19:09 +0800
+Subject: [PATCH] log uploader
+
+
+diff --git a/src/main/java/cn/afternode/chair/Chair.java b/src/main/java/cn/afternode/chair/Chair.java
+index ae9767256d723dacef94ac1aecfe0718462145e7..ccf51a011a55e084dd1a441d284a946c0b425c4c 100644
+--- a/src/main/java/cn/afternode/chair/Chair.java
++++ b/src/main/java/cn/afternode/chair/Chair.java
+@@ -1,8 +1,53 @@
+ package cn.afternode.chair;
+ 
++import com.mojang.logging.LogQueues;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++import java.util.concurrent.Executor;
++import java.util.concurrent.Executors;
++
+ public class Chair {
+     public static final Logger LOG = LoggerFactory.getLogger("Chair");
++
++    private static Executor executor;
++
++    private static Thread logQueueThread;
++    private static List<String> logs;
++
++    public static void init() {
++        Chair.executor = Executors.newCachedThreadPool();
++
++        Chair.logQueueThread = new Thread(Chair::logQueue);
++        Chair.logQueueThread.setName("ChairLogQueue");
++        Chair.logQueueThread.start();
++    }
++
++    private static void logQueue() {
++        Chair.LOG.info("Log queue thread started");
++        Chair.logs = new ArrayList<>();
++
++        String s;
++        while ((s = LogQueues.getNextLogEvent("ChairLogQueue")) != null) {
++            if (Chair.logs.size() >= 5000)
++                Chair.logs.removeFirst();
++            Chair.logs.add(s);
++        }
++    }
++
++    public static List<String> getLatestLogs(int count) {
++        if (Chair.logs == null || Chair.logs.isEmpty() || count <= 0) {
++            return Collections.emptyList();
++        }
++        int size = Chair.logs.size();
++        int fromIndex = Math.max(size - count, 0);
++        return Chair.logs.subList(fromIndex, size);
++    }
++
++    public static Executor getExecutor() {
++        return executor;
++    }
+ }
+diff --git a/src/main/java/cn/afternode/chair/command/ChairMainCommand.java b/src/main/java/cn/afternode/chair/command/ChairMainCommand.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef06a804f1aa07a797bd773941572ee058b789d7
+--- /dev/null
++++ b/src/main/java/cn/afternode/chair/command/ChairMainCommand.java
+@@ -0,0 +1,51 @@
++package cn.afternode.chair.command;
++
++import cn.afternode.chair.Chair;
++import cn.afternode.chair.utils.LogUtils;
++import com.mojang.brigadier.CommandDispatcher;
++import com.mojang.brigadier.arguments.IntegerArgumentType;
++import com.mojang.brigadier.context.CommandContext;
++import net.minecraft.ChatFormatting;
++import net.minecraft.commands.CommandSourceStack;
++import net.minecraft.commands.Commands;
++import net.minecraft.network.chat.ClickEvent;
++import net.minecraft.network.chat.Component;
++import net.minecraft.network.chat.ComponentUtils;
++
++import java.util.List;
++
++public class ChairMainCommand {
++    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
++        dispatcher.register(Commands.literal("chair")
++                .requires(s -> s.hasPermission(4, "chair.admin"))
++                .then(
++                        Commands.literal("upload")
++                                .then(Commands.argument("lines", IntegerArgumentType.integer(10, 5000))
++                                        .executes(ChairMainCommand::upload))
++
++                )
++        );
++    }
++
++    private static int upload(CommandContext<CommandSourceStack> context) {
++        final int lines = IntegerArgumentType.getInteger(context, "lines");
++        final CommandSourceStack src = context.getSource();
++        Chair.getExecutor().execute(() -> {
++            src.sendSystemMessage(Component.literal("Collecting logs..."));
++            List<String> ln = Chair.getLatestLogs(lines);
++            String logs = String.join("", ln);
++            src.sendSystemMessage(Component.literal("Uploading " + ln.size() + " lines..."));
++            try {
++                String url = LogUtils.uploadLogs(logs);
++                src.sendSystemMessage(Component.literal("Logs uploaded to ").append(Component.literal(url)
++                        .withStyle(s -> s.withColor(ChatFormatting.GREEN)
++                                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url)))));
++                Chair.LOG.info("{} uploaded {} lines of logs to {}", src.getTextName(), lines, url);
++            } catch (Throwable t) {
++                Chair.LOG.error("({}) Error uploading logs", src.getTextName(), t);
++                src.sendSystemMessage(Component.literal("Error uploading logs"));
++            }
++        });
++        return 1;
++    }
++}
+diff --git a/src/main/java/net/minecraft/commands/Commands.java b/src/main/java/net/minecraft/commands/Commands.java
+index e5c3b5cf3cc3a1de00772f30a3ebc0a378905add..c892a23bf63177a72e80e0364ac6df9e283ae707 100644
+--- a/src/main/java/net/minecraft/commands/Commands.java
++++ b/src/main/java/net/minecraft/commands/Commands.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.commands;
+ 
++import cn.afternode.chair.command.ChairMainCommand;
+ import cn.afternode.chair.command.ChairUnsafeCommand;
+ import com.google.common.collect.Maps;
+ import com.mojang.brigadier.ParseResults;
+@@ -264,7 +265,10 @@ public class Commands {
+             org.purpurmc.purpur.command.RamBarCommand.register(this.dispatcher); // Purpur
+             org.purpurmc.purpur.command.RamCommand.register(this.dispatcher); // Purpur
+ 
+-            ChairUnsafeCommand.register(this.dispatcher); // Chair - register command
++            // Chair start - register command
++            ChairMainCommand.register(this.dispatcher);
++            ChairUnsafeCommand.register(this.dispatcher);
++            // Chair end
+         }
+ 
+         if (environment.includeIntegrated) {
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index e3b7e7a796fc77fa651d26182480d7cb1df111d2..c008fc0f80310e5e31c43e00e762793b7711505e 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -1,7 +1,6 @@
+ package net.minecraft.server.dedicated;
+ 
+ import cn.afternode.chair.Chair;
+-import cn.afternode.chair.ChairConfig;
+ import com.google.common.collect.Lists;
+ import com.mojang.authlib.GameProfile;
+ import com.mojang.datafixers.DataFixer;
+@@ -328,6 +327,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         this.server.loadPlugins();
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.STARTUP);
+         // CraftBukkit end
++        Chair.init();   // Chair - initialize
+ 
+         // Paper start - Add Velocity IP Forwarding Support
+         boolean usingProxy = org.spigotmc.SpigotConfig.bungee || io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled;
+diff --git a/src/main/resources/log4j2.xml b/src/main/resources/log4j2.xml
+index a056aa167887abef9e6d531a9edd2cda433567d2..edc46b55b1c3a89dd32373571f310be347f6066e 100644
+--- a/src/main/resources/log4j2.xml
++++ b/src/main/resources/log4j2.xml
+@@ -13,6 +13,18 @@
+             </PatternLayout>
+             <!-- Purpur end -->
+         </Queue>
++        <!-- Chair start - Log queue -->
++        <Queue name="ChairLogQueue">
++            <PatternLayout>
++                <LoggerNamePatternSelector defaultPattern="%highlightError{[%d{HH:mm:ss} %level]: [%logger] %msg%n%xEx{full}}">
++                    <!-- Log root, Minecraft, Mojang and Bukkit loggers without prefix -->
++                    <!-- Disable prefix for various plugins that bypass the plugin logger -->
++                    <PatternMatch key=",net.minecraft.,Minecraft,com.mojang.,com.sk89q.,ru.tehkode.,Minecraft.AWE"
++                                  pattern="%highlightError{[%d{HH:mm:ss} %level]: %msg%n%xEx{full}}" />
++                </LoggerNamePatternSelector>
++            </PatternLayout>
++        </Queue>
++        <!-- Chair end -->
+         <TerminalConsole name="TerminalConsole">
+             <PatternLayout>
+                 <LoggerNamePatternSelector defaultPattern="%highlightError{[%d{HH:mm:ss} %level]: [%logger] %msg%n%xEx{full}}">
+@@ -50,6 +62,7 @@
+             <AppenderRef ref="File"/>
+             <AppenderRef ref="TerminalConsole" level="info"/>
+             <AppenderRef ref="ServerGuiConsole" level="info"/>
++            <AppenderRef ref="ChairLogQueue" level="info"/>
+         </Rewrite>
+     </Appenders>
+     <Loggers>
